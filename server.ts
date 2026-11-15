@@ -44,7 +44,7 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || '',
   httpOptions: {
     headers: {
-      'User-Agent': 'aistudio-build',
+      'User-Agent': 'gitreplay',
     },
   },
 });
@@ -538,6 +538,15 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
   }
 });
 
+// JSON parse / middleware error handler so API callers always receive JSON instead of HTML stack traces
+app.use((err: any, req: Request, res: Response, next: (err?: any) => void) => {
+  if (err && req.path.startsWith('/api')) {
+    const status = typeof err.status === 'number' ? err.status : 400;
+    return res.status(status).json({ error: err.message || 'Invalid API request payload.' });
+  }
+  next(err);
+});
+
 // Mount Vite in development or serve static in production
 async function startServer() {
   const isProd =
@@ -563,9 +572,18 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GitReplay server running on http://0.0.0.0:${PORT}`);
   });
+
+  const shutdown = (signal: string) => {
+    console.log(`Received ${signal}, shutting down server gracefully...`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer();

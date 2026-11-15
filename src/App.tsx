@@ -109,7 +109,9 @@ export default function App() {
   const [annotations, setAnnotations] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('gitreplay_annotations_v1');
-      return saved ? JSON.parse(saved) : {};
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
     } catch {
       return {};
     }

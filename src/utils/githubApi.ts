@@ -123,7 +123,19 @@ async function githubFetch(url: string): Promise<Response> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, { headers });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  let res: Response;
+  try {
+    res = await fetch(url, { headers, signal: controller.signal });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('GitHub API request timed out after 25s. Please try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   const rateInfo = updateRateLimitFromHeaders(res.headers);
 
   if (
@@ -332,8 +344,14 @@ export async function fetchGitHubCommitPage(
   const cleanTagFrom = tagFrom?.trim();
   const cleanTagTo = tagTo?.trim();
   const cleanPath = filterPath?.trim().replace(/^\/+/, '');
-  const sinceIso = since?.trim() ? new Date(`${since.trim()}T00:00:00Z`).toISOString() : '';
-  const untilIso = until?.trim() ? new Date(`${until.trim()}T23:59:59Z`).toISOString() : '';
+  const toSafeIso = (rawDate: string | undefined, suffix: string): string => {
+    const trimmed = rawDate?.trim();
+    if (!trimmed) return '';
+    const d = new Date(`${trimmed}${suffix}`);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+  };
+  const sinceIso = toSafeIso(since, 'T00:00:00Z');
+  const untilIso = toSafeIso(until, 'T23:59:59Z');
 
   if (cleanTagFrom && cleanTagTo && page === 1) {
     // Use GitHub Compare API for exact tag/release range
