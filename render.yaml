@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gitreplay
+    runtime: node
+    plan: free
+    buildCommand: VITE_BASE_PATH=/ npm install --include=dev --legacy-peer-deps && VITE_BASE_PATH=/ npm run build
+    startCommand: NODE_ENV=production npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_BASE_PATH
+        value: /
+      - key: GEMINI_API_KEY
+        sync: false

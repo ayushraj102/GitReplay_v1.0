@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   workflow_dispatch:
 
 permissions:
@@ -20,12 +21,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Check GitHub Pages configuration
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATUS=$(curl -s -o /tmp/pages.json -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          if [ "$STATUS" = "404" ]; then
+            echo "::error::GitHub Pages is not enabled for this repository yet. Open Settings -> Pages -> Build and deployment -> Source, select 'GitHub Actions', then click 'Run workflow' in the Actions tab."
+            exit 1
+          fi
+          if [ "$STATUS" = "200" ] && ! grep -q '"build_type":[[:space:]]*"workflow"' /tmp/pages.json; then
+            echo "::error::GitHub Pages Source is set to 'Deploy from a branch' instead of 'GitHub Actions'. Open Settings -> Pages -> Build and deployment -> Source and select 'GitHub Actions', then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install dependencies
         run: |
@@ -40,9 +62,9 @@ jobs:
 
       - name: Build static site for GitHub Pages
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '' }}
-        run: npx vite build
+        run: npm run build:gh-pages
 
       - name: Add SPA fallback and .nojekyll
         run: |
@@ -50,9 +72,9 @@ jobs:
           touch dist/.nojekyll
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: ./dist
 
   deploy:
     environment:
@@ -63,4 +85,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

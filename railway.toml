@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install --include=dev --legacy-peer-deps && VITE_BASE_PATH=/ npm run build"
+
+[deploy]
+startCommand = "NODE_ENV=production npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"

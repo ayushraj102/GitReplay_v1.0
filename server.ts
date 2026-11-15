@@ -540,7 +540,11 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
 
 // Mount Vite in development or serve static in production
 async function startServer() {
-  if (process.env.NODE_ENV === 'production') {
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    __filename.endsWith(`${path.sep}dist${path.sep}server.js`);
+
+  if (isProd) {
     const distDir = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distDir));
     app.get('*', (_req, res) => {
